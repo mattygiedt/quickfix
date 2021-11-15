@@ -3,6 +3,15 @@ Generic QuickFIX and eventpp examples
 
 ## Building
 Project uses VSCode `.devcontainer` support -- look in the directory for a sample `Dockerfile` if you want to roll your own.
+```
+mkdir logs
+mkdir build
+cd build
+cmake ..
+make -j4
+root@d2e792573131:/workspaces/quickfix/build# ./cpp/fix_client ../conf/fix_client.ini
+root@d2e792573131:/workspaces/quickfix/build# ./cpp/fix_server ../conf/fix_server.ini
+```
 
 ## Workflow
 After a successful login, client sends the server a `NewOrderSingle` which gets fully executed, and the `ExecutionReport` is sent back to the client. Client then tries to `OrderCancelRequest` the order, which is handled with a `OrderCancelReject`.
