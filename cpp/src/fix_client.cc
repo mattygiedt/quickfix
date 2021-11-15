@@ -5,9 +5,35 @@
 #include "client_app.h"
 #include "common/application_traits.h"
 
+std::atomic<bool> running_;
+std::mutex running_mutex_;
+std::condition_variable running_cv_;
+
+auto SignalHandler(int /*unused*/) -> void {
+  running_ = false;
+  running_cv_.notify_all();
+}
+
+auto SetupSignalHandler() -> void {
+  struct sigaction sig_int_handler;
+  sig_int_handler.sa_handler = SignalHandler;
+  sigemptyset(&sig_int_handler.sa_mask);
+  sig_int_handler.sa_flags = 0;
+  sigaction(SIGINT, &sig_int_handler, nullptr);
+}
+
+auto WaitForSignal() -> void {
+  running_ = true;
+  while (running_) {
+    std::unique_lock<decltype(running_mutex_)> lock(running_mutex_);
+    running_cv_.wait(lock);
+  }
+}
+
 template <typename Traits>
 class FixClient : public Traits {
  private:
+  using TimeUtil = common::TimeUtil;
   using ClientApplication =
       fixclient::Application<typename Traits::EventQueuePtr>;
 
@@ -29,23 +55,33 @@ class FixClient : public Traits {
 
   auto Start() -> void {
     initiator_->start();
+    process_thread_ = std::thread([&]() {
+      while (!initiator_->isStopped()) {
+        if (queue_->emptyQueue()) {
+          queue_->waitFor(Traits::kQueueWait);
+        }
 
-    while (!initiator_->isStopped()) {
-      if (queue_->emptyQueue()) {
-        queue_->waitFor(Traits::kQueueWait);
+        queue_->process();
       }
-
-      queue_->process();
-    }
+    });
   }
 
-  auto Stop() -> void { initiator_->stop(); }
+  auto SendOrder() -> void {
+    application_.SendNewOrderSingle(std::to_string(TimeUtil::EpochNanos()),
+                                    Traits::GetSessionID());
+  }
+
+  auto Stop() -> void {
+    initiator_->stop();
+    process_thread_.join();
+  }
 
  private:
   std::string config_;
   typename Traits::EventQueuePtr queue_;
   ClientApplication application_;
   std::unique_ptr<FIX::Initiator> initiator_;
+  std::thread process_thread_;
 };
 
 auto main(int argc, char** argv) -> int {
@@ -60,6 +96,8 @@ auto main(int argc, char** argv) -> int {
   FixClient<common::ClientTraits> client(file);
   client.Initialize();
   client.Start();
+  client.SendOrder();
+  WaitForSignal();
   client.Stop();
   return 1;
 }
