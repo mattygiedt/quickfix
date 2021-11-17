@@ -7,7 +7,7 @@
 #include "common/signal_handler.h"
 
 template <typename Traits>
-class FixClient : public Traits {
+class FixClient {
  private:
   using TimeUtil = common::TimeUtil;
   using ClientApplication =
