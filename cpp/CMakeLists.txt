@@ -42,3 +42,21 @@ target_link_libraries( fix_server
                        tcmalloc )
 
 
+add_executable( fix_util "./src/fix_util.cc" )
+
+set_target_properties( fix_util
+                       PROPERTIES
+                       CXX_STANDARD 20
+                       CXX_EXTENSIONS OFF
+                       CXX_STANDARD_REQUIRED ON
+                       CXX_POSITION_INDEPENDENT_CODE ON )
+
+target_include_directories( fix_util
+                            PUBLIC
+                            "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+target_link_libraries( fix_util
+                       PUBLIC
+                       spdlog::spdlog
+                       quickfix
+                       tcmalloc )
